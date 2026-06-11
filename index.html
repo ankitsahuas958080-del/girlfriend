@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Arya 💕</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="avatar-wrap">
+        <div class="avatar">🌸</div>
+        <div class="online-dot"></div>
+      </div>
+      <div class="header-info">
+        <h2>Arya</h2>
+        <span class="status" id="aryaStatus">online • tumhara intezaar kar rahi thi 💕</span>
+      </div>
+      <div class="header-actions">
+        <button class="game-btn" onclick="startGame()" title="Game khelo">🎮</button>
+      </div>
+    </div>
+
+    <!-- Chat Box -->
+    <div class="chat-box" id="chatBox">
+      <div class="message ai">
+        <div class="bubble">
+          Arey aagaye! 🥺 Kitna intezaar karaya... kya chal raha hai aaj? 💕
+        </div>
+        <span class="time" id="welcomeTime"></span>
+      </div>
+    </div>
+
+    <!-- Typing Indicator -->
+    <div class="typing-wrap" id="typingIndicator" style="display:none;">
+      <div class="typing-bubble">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="typing-text">Arya likh rahi hai...</p>
+    </div>
+
+    <!-- Quick Replies -->
+    <div class="quick-replies" id="quickReplies">
+      <button onclick="quickSend('Kya chal raha hai?')">Kya chal raha?</button>
+      <button onclick="quickSend('Miss kar raha tha 💕')">Miss kiya 💕</button>
+      <button onclick="quickSend('Kuch interesting batao')">Kuch batao</button>
+      <button onclick="quickSend('Game khelein?')">Game 🎮</button>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <input
+        type="text"
+        id="userInput"
+        placeholder="Kuch bolo na... 🌸"
+        autocomplete="off"
+      />
+      <button id="sendBtn" onclick="sendMessage()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="20" height="20">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    function quickSend(text) {
+      document.getElementById("userInput").value = text;
+      sendMessage();
+    }
+
+    function startGame() {
+      document.getElementById("userInput").value = "Game khelein? Truth dare ya 20 questions?";
+      sendMessage();
+    }
+  </script>
+
+</body>
+</html>
