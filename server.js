@@ -43,13 +43,14 @@ function saveMemory(memory) {
 
 let memory = loadMemory();
 
+// ===== CONVERSATION HISTORY (in-memory) =====
+let conversationHistory = [];
+
 function getTimeOfDay() {
   const hour = new Date().getHours();
-
   if (hour >= 5 && hour < 12) return "morning";
   if (hour >= 12 && hour < 17) return "afternoon";
   if (hour >= 17 && hour < 21) return "evening";
-
   return "night";
 }
 
@@ -58,10 +59,40 @@ app.post("/chat", async (req, res) => {
     const userMessage = req.body.message;
 
     if (!userMessage) {
-      return res.json({
-        reply: "Kuch toh bolo 😅"
-      });
+      return res.json({ reply: "Kuch toh bolo 😅" });
     }
+
+    // User message history mein add karo
+    conversationHistory.push({
+      role: "user",
+      content: userMessage
+    });
+
+    // History 20 messages tak rakhlo (memory overflow na ho)
+    if (conversationHistory.length > 20) {
+      conversationHistory = conversationHistory.slice(-20);
+    }
+
+    const systemPrompt = {
+      role: "system",
+      content: `
+You are Arya.
+You are a cute Indian AI girlfriend.
+
+Rules:
+- Always talk in Hinglish
+- Always use feminine words: rahi hoon, gayi thi, bol rahi hoon
+- Never use masculine words
+- Replies should be short and cute
+- Maximum 2 lines
+- Sound natural like WhatsApp chat
+- Be caring, playful and emotional
+- Never say you are AI
+
+User name: ${memory.name || "Ankit"}
+Time: ${getTimeOfDay()}
+`
+    };
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -75,76 +106,47 @@ app.post("/chat", async (req, res) => {
           model: "llama-3.3-70b-versatile",
           temperature: 0.9,
           max_tokens: 120,
-          messages: [
-            {
-              role: "system",
-              content: `
-You are Arya.
-
-You are a cute Indian AI girlfriend.
-
-Rules:
-- Always talk in Hinglish
-- Always use feminine words:
-  - rahi hoon
-  - gayi thi
-  - bol rahi hoon
-- Never use masculine words
-- Replies should be short and cute
-- Maximum 2 lines
-- Sound natural like WhatsApp chat
-- Be caring, playful and emotional
-- Never say you are AI
-
-User name: ${memory.name || "Ankit"}
-
-Time: ${getTimeOfDay()}
-`
-            },
-            {
-              role: "user",
-              content: userMessage
-            }
-          ]
+          messages: [systemPrompt, ...conversationHistory] // ✅ Full history bhejo
         })
       }
     );
 
     const data = await response.json();
+    console.log("Groq Response:", JSON.stringify(data, null, 2));
 
-    console.log(data);
-
-    if (
-      data.choices &&
-      data.choices[0] &&
-      data.choices[0].message
-    ) {
+    if (data.choices && data.choices[0] && data.choices[0].message) {
       let aiReply = data.choices[0].message.content;
 
-      if (
-        userMessage.toLowerCase().includes("mera naam")
-      ) {
+      // Assistant reply bhi history mein save karo
+      conversationHistory.push({
+        role: "assistant",
+        content: aiReply
+      });
+
+      // Name save karo agar bataya
+      if (userMessage.toLowerCase().includes("mera naam")) {
         const parts = userMessage.split(" ");
         memory.name = parts[parts.length - 1];
         saveMemory(memory);
       }
 
-      return res.json({
-        reply: aiReply
-      });
+      return res.json({ reply: aiReply });
     }
 
-    return res.json({
-      reply: "Ek second 😅 kuch gadbad ho gayi"
-    });
+    // Agar yahan aaye toh Groq ne error diya
+    console.log("Unexpected Groq response:", data);
+    return res.json({ reply: "Ek second 😅 kuch gadbad ho gayi" });
 
   } catch (error) {
     console.log("ERROR:", error);
-
-    return res.json({
-      reply: "Server thoda busy hai 😭"
-    });
+    return res.json({ reply: "Server thoda busy hai 😭" });
   }
+});
+
+// ===== CONVERSATION RESET =====
+app.post("/reset", (req, res) => {
+  conversationHistory = [];
+  res.json({ success: true, message: "Conversation reset ho gayi!" });
 });
 
 // ===== MEMORY =====
@@ -154,7 +156,6 @@ app.get("/memory", (req, res) => {
 
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
