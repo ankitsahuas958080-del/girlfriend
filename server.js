@@ -49,7 +49,7 @@ function saveMemory(memory) {
 
 let memory = loadMemory();
 
-// ===== CONVERSATION HISTORY =====
+// ===== CHAT HISTORY =====
 let conversationHistory = [];
 
 // ===== TIME HELPER =====
@@ -63,9 +63,75 @@ function getTimeOfDay() {
   return "night";
 }
 
-// ===== CHAT API =====
+// ===== GROQ RETRY SYSTEM =====
+async function askGroq(messages) {
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+
+    try {
+
+      const response = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+
+          headers: {
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            model: "llama3-8b-8192",
+
+            temperature: 0.7,
+
+            top_p: 0.9,
+
+            max_tokens: 80,
+
+            messages: messages
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      console.log("STATUS:", response.status);
+
+      console.log(
+        "Groq Response:",
+        JSON.stringify(data, null, 2)
+      );
+
+      // ===== SUCCESS =====
+      if (
+        response.ok &&
+        data.choices &&
+        data.choices[0] &&
+        data.choices[0].message
+      ) {
+        return data.choices[0].message.content;
+      }
+
+      console.log("Retry attempt:", attempt);
+
+    } catch (err) {
+
+      console.log("Retry error:", err);
+    }
+
+    // ===== WAIT BEFORE RETRY =====
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  return null;
+}
+
+// ===== CHAT ROUTE =====
 app.post("/chat", async (req, res) => {
+
   try {
+
     const userMessage = req.body.message;
 
     if (!userMessage) {
@@ -82,12 +148,14 @@ app.post("/chat", async (req, res) => {
 
     // ===== LIMIT HISTORY =====
     if (conversationHistory.length > 20) {
-      conversationHistory = conversationHistory.slice(-20);
+      conversationHistory =
+        conversationHistory.slice(-20);
     }
 
     // ===== SYSTEM PROMPT =====
     const systemPrompt = {
       role: "system",
+
       content: `
 You are Arya.
 
@@ -102,8 +170,8 @@ Rules:
 - Never say you are AI
 
 IMPORTANT:
-- If user asks coding, study, science, technical,
-  weird or random questions,
+- If user asks coding, study, science,
+  technical, weird or random questions,
   answer intelligently.
 - Never get confused.
 - Never break character.
@@ -113,87 +181,42 @@ Current time: ${getTimeOfDay()}
 `
     };
 
-    // ===== GROQ API CALL =====
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
+    // ===== ASK GROQ =====
+    const aiReply = await askGroq([
+      systemPrompt,
+      ...conversationHistory
+    ]);
 
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
+    // ===== IF FAILED =====
+    if (!aiReply) {
 
-        body: JSON.stringify({
-          model: "llama3-8b-8192",
-
-          temperature: 0.7,
-
-          top_p: 0.9,
-
-          max_tokens: 80,
-
-          messages: [
-            systemPrompt,
-            ...conversationHistory
-          ]
-        })
-      }
-    );
-
-    // ===== RESPONSE DATA =====
-    const data = await response.json();
-
-    console.log("STATUS:", response.status);
-
-    console.log(
-      "Groq Response:",
-      JSON.stringify(data, null, 2)
-    );
-
-    // ===== API ERROR =====
-    if (!response.ok) {
       return res.json({
         reply:
-          "Arya thodi tired ho gayi 😭 thoda baad mein try karo"
+          "Arya sleepy ho gayi 😭 thodi der baad baat karte hain"
       });
     }
 
-    // ===== VALID RESPONSE =====
+    // ===== SAVE AI REPLY =====
+    conversationHistory.push({
+      role: "assistant",
+      content: aiReply
+    });
+
+    // ===== SAVE USER NAME =====
     if (
-      data.choices &&
-      data.choices[0] &&
-      data.choices[0].message
+      userMessage.toLowerCase().includes("mera naam")
     ) {
-      let aiReply = data.choices[0].message.content;
 
-      // ===== SAVE AI MESSAGE =====
-      conversationHistory.push({
-        role: "assistant",
-        content: aiReply
-      });
+      const parts = userMessage.split(" ");
 
-      // ===== SAVE USER NAME =====
-      if (
-        userMessage.toLowerCase().includes("mera naam")
-      ) {
-        const parts = userMessage.split(" ");
+      memory.name = parts[parts.length - 1];
 
-        memory.name = parts[parts.length - 1];
-
-        saveMemory(memory);
-      }
-
-      return res.json({
-        reply: aiReply
-      });
+      saveMemory(memory);
     }
 
-    // ===== INVALID RESPONSE =====
-    console.log("Unexpected response:", data);
-
+    // ===== SEND REPLY =====
     return res.json({
-      reply: "Ek second 😅 kuch gadbad ho gayi"
+      reply: aiReply
     });
 
   } catch (error) {
@@ -209,6 +232,7 @@ Current time: ${getTimeOfDay()}
 
 // ===== RESET CHAT =====
 app.post("/reset", (req, res) => {
+
   conversationHistory = [];
 
   res.json({
