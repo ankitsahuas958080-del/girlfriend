@@ -103,7 +103,7 @@ Time: ${getTimeOfDay()}
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama3-8b-8192",
           temperature: 0.9,
           max_tokens: 120,
           messages: [systemPrompt, ...conversationHistory] // ✅ Full history bhejo
