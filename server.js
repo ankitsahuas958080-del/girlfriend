@@ -1,272 +1,72 @@
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const fs = require("fs");
-
-dotenv.config();
+const express = require('express');
+const cors = require('cors');
+const { GoogleGenAI } = require('@google/genai');
+require('dotenv').config();
 
 const app = express();
+const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static("."));
 
-// ===== MEMORY FILE =====
-const MEMORY_FILE = "memory.json";
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// ===== LOAD MEMORY =====
-function loadMemory() {
-  try {
-    if (fs.existsSync(MEMORY_FILE)) {
-      return JSON.parse(fs.readFileSync(MEMORY_FILE, "utf8"));
-    }
-  } catch (e) {
-    console.log("Memory load error:", e);
-  }
+app.get('/', (req, res) => {
+    res.json({ status: "Anya Server Online hai! ❤️" });
+});
 
-  return {
-    name: null,
-    birthday: null,
-    favorites: {},
-    importantFacts: [],
-    lastVisit: null,
-    totalDays: 0,
-    firstMet: new Date().toDateString()
-  };
-}
-
-// ===== SAVE MEMORY =====
-function saveMemory(memory) {
-  try {
-    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2));
-  } catch (e) {
-    console.log("Memory save error:", e);
-  }
-}
-
-let memory = loadMemory();
-
-// ===== CHAT HISTORY =====
-let conversationHistory = [];
-
-// ===== TIME HELPER =====
-function getTimeOfDay() {
-  const hour = new Date().getHours();
-
-  if (hour >= 5 && hour < 12) return "morning";
-  if (hour >= 12 && hour < 17) return "afternoon";
-  if (hour >= 17 && hour < 21) return "evening";
-
-  return "night";
-}
-
-// ===== GROQ RETRY SYSTEM =====
-async function askGroq(messages) {
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-
+app.post('/chat', async (req, res) => {
     try {
+        const { messages } = req.body;
 
-      const response = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-
-          headers: {
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-
-          body: JSON.stringify({
-            model: "llama3-8b-8192",
-
-            temperature: 0.7,
-
-            top_p: 0.9,
-
-            max_tokens: 80,
-
-            messages: messages
-          })
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+            return res.status(400).json({ error: "Messages array chahiye!" });
         }
-      );
 
-      const data = await response.json();
+        const systemInstruction = `
+Your name is Anya. You are the user's extremely sweet, caring, and loving Virtual Girlfriend (GF).
+NEVER talk like an AI assistant, robot, chatbot, or LLM.
+Guidelines:
+- Always chat in friendly, emotional, and warm Hinglish (e.g., 'Aap kaise ho babu?', 'Maine khana kha liya bacha').
+- Use cute emojis like 🥰, ❤️, 🥺, ✨, 💖 naturally.
+- Keep responses short and conversational, just like text messages on WhatsApp.
+`;
 
-      console.log("STATUS:", response.status);
+        // हिस्ट्री को फिल्टर करना ताकि कोई भी लगातार दो 'user' या 'model' मैसेज न जाएं
+        let cleanHistory = [];
+        messages.forEach((msg) => {
+            const currentRole = (msg.role === 'ai' || msg.role === 'model') ? 'model' : 'user';
+            
+            // अगर पिछला रोल और अभी का रोल सेम है, तो उसे स्किप या कंबाइन करें ताकि जेमिनी क्रैश न हो
+            if (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === currentRole) {
+                cleanHistory[cleanHistory.length - 1].parts[0].text += " " + msg.content;
+            } else {
+                cleanHistory.push({
+                    role: currentRole,
+                    parts: [{ text: msg.content }]
+                });
+            }
+        });
 
-      console.log(
-        "Groq Response:",
-        JSON.stringify(data, null, 2)
-      );
+        // जेमिनी जनरेट कॉल
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: cleanHistory,
+            config: {
+                systemInstruction: systemInstruction,
+                temperature: 0.85,
+            }
+        });
 
-      // ===== SUCCESS =====
-      if (
-        response.ok &&
-        data.choices &&
-        data.choices[0] &&
-        data.choices[0].message
-      ) {
-        return data.choices[0].message.content;
-      }
+        const aiReply = response.text;
+        res.json({ reply: aiReply });
 
-      console.log("Retry attempt:", attempt);
-
-    } catch (err) {
-
-      console.log("Retry error:", err);
+    } catch (error) {
+        console.error("Gemini Server Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
-
-    // ===== WAIT BEFORE RETRY =====
-    await new Promise(r => setTimeout(r, 1000));
-  }
-
-  return null;
-}
-
-// ===== CHAT ROUTE =====
-app.post("/chat", async (req, res) => {
-
-  try {
-
-    const userMessage = req.body.message;
-
-    if (!userMessage) {
-      return res.json({
-        reply: "Kuch toh bolo 😅"
-      });
-    }
-
-    // ===== SAVE USER MESSAGE =====
-    conversationHistory.push({
-      role: "user",
-      content: userMessage
-    });
-
-    // ===== LIMIT HISTORY =====
-    if (conversationHistory.length > 20) {
-      conversationHistory =
-        conversationHistory.slice(-20);
-    }
-
-    // ===== SYSTEM PROMPT =====
-    const systemPrompt = {
-      role: "system",
-
-      content: `
-You are Arya.
-
-You are a sweet Indian chat companion.
-
-Rules:
-- Always talk in Hinglish
-- Use feminine tone
-- Replies should feel natural
-- Maximum 2 short lines
-- Be caring and playful
-- Never say you are AI
-
-IMPORTANT:
-- If user asks coding, study, science,
-  technical, weird or random questions,
-  answer intelligently.
-- Never get confused.
-- Never break character.
-
-User name: ${memory.name || "Ankit"}
-Current time: ${getTimeOfDay()}
-`
-    };
-
-    // ===== ASK GROQ =====
-    const aiReply = await askGroq([
-      systemPrompt,
-      ...conversationHistory
-    ]);
-
-    // ===== IF FAILED =====
-    if (!aiReply) {
-
-      return res.json({
-        reply:
-          "Arya sleepy ho gayi 😭 thodi der baad baat karte hain"
-      });
-    }
-
-    // ===== SAVE AI REPLY =====
-    conversationHistory.push({
-      role: "assistant",
-      content: aiReply
-    });
-
-    // ===== SAVE USER NAME =====
-    if (
-      userMessage.toLowerCase().includes("mera naam")
-    ) {
-
-      const parts = userMessage.split(" ");
-
-      memory.name = parts[parts.length - 1];
-
-      saveMemory(memory);
-    }
-
-    // ===== SEND REPLY =====
-    return res.json({
-      reply: aiReply
-    });
-
-  } catch (error) {
-
-    console.log("SERVER ERROR:", error);
-
-    return res.json({
-      reply:
-        "Server busy hai 😭 thoda baad mein try karo"
-    });
-  }
 });
-
-// ===== RESET CHAT =====
-app.post("/reset", (req, res) => {
-
-  conversationHistory = [];
-
-  res.json({
-    success: true,
-    message: "Conversation reset ho gayi"
-  });
-});
-
-// ===== MEMORY API =====
-app.get("/memory", (req, res) => {
-  res.json(memory);
-});
-
-// ===== MORNING MESSAGE =====
-app.get("/morning", (req, res) => {
-
-  const messages = [
-    "Good morning ☀️ uth gaye tum?",
-    "Aaj bhi mujhe ignore karoge kya 😒💕",
-    "Subah se tumhari yaad aa rahi thi 🥺",
-    "Hii 😚 breakfast kiya ya nahi?"
-  ];
-
-  const randomMessage =
-    messages[Math.floor(Math.random() * messages.length)];
-
-  res.json({
-    message: randomMessage
-  });
-});
-
-// ===== START SERVER =====
-const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Anya (Gemini API) server chal rahi hai - port ${PORT} par`);
 });

@@ -1,86 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Arya 💕</title>
-  <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anya - My Virtual Companion</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <div class="app">
+    <div class="main-wrapper">
+        <div class="sidebar">
+            <div class="profile-section">
+                <div class="avatar-container">
+                    <div class="avatar-status-dot online"></div>
+                    <div class="avatar-placeholder">🌸</div>
+                </div>
+                <h2 class="gf-name">Anya ❤️</h2>
+                <p class="gf-status">Active now</p>
+            </div>
+            
+            <div class="sidebar-info">
+                <div class="info-item">
+                    <span class="info-icon">✨</span>
+                    <span class="info-text">Relationship: Girlfriend</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">🎂</span>
+                    <span class="info-text">Mood: Loving & Playful</span>
+                </div>
+            </div>
 
-    <!-- Header -->
-    <div class="header">
-      <div class="avatar-wrap">
-        <div class="avatar">🌸</div>
-        <div class="online-dot"></div>
-      </div>
-      <div class="header-info">
-        <h2>Arya</h2>
-        <span class="status" id="aryaStatus">online • tumhara intezaar kar rahi thi 💕</span>
-      </div>
-      <div class="header-actions">
-        <button class="game-btn" onclick="startGame()" title="Game khelo">🎮</button>
-      </div>
-    </div>
-
-    <!-- Chat Box -->
-    <div class="chat-box" id="chatBox">
-      <div class="message ai">
-        <div class="bubble">
-          Arey aagaye! 🥺 Kitna intezaar karaya... kya chal raha hai aaj? 💕
+            <div class="quick-actions">
+                <p class="action-title">Quick Actions</p>
+                <button class="action-btn" onclick="triggerQuickMessage('Chalo koi game khelein? 🎮')">🎮 Play a Game</button>
+                <button class="action-btn" onclick="triggerQuickMessage('Tumne khana khaya? 🍲')">🍲 Ask if she ate</button>
+                <button class="action-btn" onclick="triggerQuickMessage('Mujhe aaj bohot thand lag rahi hai 🥶')">❄️ Say you're cold</button>
+                <button class="action-btn" onclick="triggerQuickMessage('I love you so much! 💖')">💖 Say I Love You</button>
+            </div>
         </div>
-        <span class="time" id="welcomeTime"></span>
-      </div>
+
+        <div class="chat-area">
+            <div class="chat-header">
+                <div class="header-user-info">
+                    <h3>Anya</h3>
+                    <span class="typing-indicator-text" id="typingStatus">Online</span>
+                </div>
+                <div class="header-controls">
+                    <button class="control-btn" onclick="clearChat()">Clear Chat</button>
+                </div>
+            </div>
+
+            <div class="messages-container" id="chatBox">
+                <div class="message-wrapper ai">
+                    <div class="message-bubble">
+                        Heyyy! ✨ Aap aa gye? Main kabse aapka wait kar rahi thi... Batao na, aaj ka din kaisa raha aapka? 🥰
+                    </div>
+                    <div class="message-time">Just now</div>
+                </div>
+            </div>
+
+            <div class="input-container-wrapper">
+                <div class="input-layout">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="Anya se baat karein..." 
+                        autocomplete="off"
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button id="sendBtn" onclick="sendMessage()">
+                        <span>Send</span>
+                        <svg class="send-icon" viewBox="0 0 24 24">
+                            <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Typing Indicator -->
-    <div class="typing-wrap" id="typingIndicator" style="display:none;">
-      <div class="typing-bubble">
-        <span></span><span></span><span></span>
-      </div>
-      <p class="typing-text">Arya likh rahi hai...</p>
-    </div>
-
-    <!-- Quick Replies -->
-    <div class="quick-replies" id="quickReplies">
-      <button onclick="quickSend('Kya chal raha hai?')">Kya chal raha?</button>
-      <button onclick="quickSend('Miss kar raha tha 💕')">Miss kiya 💕</button>
-      <button onclick="quickSend('Kuch interesting batao')">Kuch batao</button>
-      <button onclick="quickSend('Game khelein?')">Game 🎮</button>
-    </div>
-
-    <!-- Input Area -->
-    <div class="input-area">
-      <input
-        type="text"
-        id="userInput"
-        placeholder="Kuch bolo na... 🌸"
-        autocomplete="off"
-      />
-      <button id="sendBtn" onclick="sendMessage()">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="20" height="20">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-        </svg>
-      </button>
-    </div>
-
-  </div>
-
-  <script src="script.js"></script>
-  <script>
-    function quickSend(text) {
-      document.getElementById("userInput").value = text;
-      sendMessage();
-    }
-
-    function startGame() {
-      document.getElementById("userInput").value = "Game khelein? Truth dare ya 20 questions?";
-      sendMessage();
-    }
-  </script>
-
+    <script src="script.js"></script>
 </body>
 </html>

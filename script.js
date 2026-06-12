@@ -1,209 +1,91 @@
-// ===== HELPER: Current Time =====
-function getTime() {
-  const now = new Date();
+let chatHistory = [];
 
-  let h = now.getHours();
-  let m = now.getMinutes();
-
-  const ampm = h >= 12 ? "PM" : "AM";
-
-  h = h % 12 || 12;
-  m = m < 10 ? "0" + m : m;
-
-  return `${h}:${m} ${ampm}`;
-}
-
-// ===== Set Welcome Message Time =====
-document.getElementById("welcomeTime").textContent = getTime();
-
-// ===== Prevent Duplicate Sending =====
-let isSending = false;
-
-// ===== Add Message to Chat =====
-function addMessage(text, sender) {
-  const chatBox = document.getElementById("chatBox");
-
-  const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message", sender);
-
-  const bubble = document.createElement("div");
-  bubble.classList.add("bubble");
-  bubble.textContent = text;
-
-  const time = document.createElement("span");
-  time.classList.add("time");
-  time.textContent = getTime();
-
-  msgDiv.appendChild(bubble);
-  msgDiv.appendChild(time);
-
-  chatBox.appendChild(msgDiv);
-
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-// ===== Show Typing =====
-function showTyping() {
-  const indicator = document.getElementById("typingIndicator");
-
-  indicator.style.display = "flex";
-
-  const chatBox = document.getElementById("chatBox");
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-// ===== Hide Typing =====
-function hideTyping() {
-  document.getElementById("typingIndicator").style.display = "none";
-}
-
-// ===== Good Morning Greeting =====
-async function loadMorningGreeting() {
-  try {
-    const lastVisit = localStorage.getItem("arya_last_visit");
-    const today = new Date().toDateString();
-
-    if (lastVisit !== today) {
-
-      await new Promise(r => setTimeout(r, 1200));
-
-      showTyping();
-
-      await new Promise(r => setTimeout(r, 1800));
-
-      const res = await fetch("/morning");
-      const data = await res.json();
-
-      hideTyping();
-
-      addMessage(data.message, "ai");
-
-      localStorage.setItem("arya_last_visit", today);
+function appendMessage(text, sender) {
+    const chatBox = document.getElementById("chatBox");
+    const wrapper = document.createElement("div");
+    wrapper.classList.add("message-wrapper");
+    if (sender === "user") {
+        wrapper.classList.add("user");
+    } else {
+        wrapper.classList.add("ai");
     }
-
-  } catch (e) {
-    console.log(e);
-  }
+    
+    const bubble = document.createElement("div");
+    bubble.classList.add("message-bubble");
+    bubble.innerText = text;
+    
+    const timeDiv = document.createElement("div");
+    timeDiv.classList.add("message-time");
+    const now = new Date();
+    timeDiv.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(timeDiv);
+    chatBox.appendChild(wrapper);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// ===== Load Memory Badge =====
-async function loadMemoryBadge() {
-  try {
-    const res = await fetch("/memory");
-    const memory = await res.json();
-
-    if (memory.name) {
-      const statusEl = document.getElementById("aryaStatus");
-
-      if (statusEl) {
-        statusEl.textContent =
-          `online • ${memory.name} ke liye yahan hoon 💕`;
-      }
-    }
-
-  } catch (e) {
-    console.log(e);
-  }
-}
-
-// ===== Send Message =====
 async function sendMessage() {
-
-  // Duplicate message stop
-  if (isSending) return;
-
-  const input = document.getElementById("userInput");
-  const sendBtn = document.getElementById("sendBtn");
-
-  const message = input.value.trim();
-
-  if (!message) return;
-
-  isSending = true;
-
-  // User message show
-  addMessage(message, "user");
-
-  input.value = "";
-  input.focus();
-
-  // Disable button
-  sendBtn.disabled = true;
-  sendBtn.style.opacity = "0.6";
-
-  // Show typing
-  showTyping();
-
-  // Fake typing delay
-  const delay = 1000 + Math.random() * 1500;
-
-  await new Promise(r => setTimeout(r, delay));
-
-  try {
-
-    const response = await fetch("/chat", {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        message: message
-      })
-    });
-
-    const data = await response.json();
-
-    hideTyping();
-
-    // AI reply
-    addMessage(data.reply, "ai");
-
-    // Update memory badge
-    loadMemoryBadge();
-
-  } catch (error) {
-
-    hideTyping();
-
-    addMessage(
-      "Arey 😵 kuch gadbad ho gayi, thoda baad mein try karo",
-      "ai"
-    );
-
-    console.error("Error:", error);
-  }
-
-  // Enable button again
-  sendBtn.disabled = false;
-  sendBtn.style.opacity = "1";
-
-  isSending = false;
+    const inputField = document.getElementById("userInput");
+    const messageText = inputField.value.trim();
+    const typingStatus = document.getElementById("typingStatus");
+    
+    if (messageText === "") return;
+    
+    appendMessage(messageText, "user");
+    inputField.value = ""; 
+    
+    // यूजर का मैसेज हिस्ट्री में पुश करें
+    chatHistory.push({ role: "user", content: messageText });
+    
+    try {
+        typingStatus.innerText = "Anya is typing...";
+        typingStatus.style.color = "#ff4b72";
+        
+        const response = await fetch("http://localhost:3000/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ messages: chatHistory })
+        });
+        
+        const data = await response.json();
+        
+        typingStatus.innerText = "Online";
+        typingStatus.style.color = "#a1a1aa";
+        
+        if (data.reply) {
+            appendMessage(data.reply, "ai");
+            // अन्या के जवाब को 'model' रोल के साथ हिस्ट्री में रखें
+            chatHistory.push({ role: "model", content: data.reply });
+        } else {
+            appendMessage("Aapki baat samajh nahi aayi, ek baar firse bolo na babu? 🥺", "ai");
+        }
+        
+    } catch (error) {
+        console.error("Connection Error:", error);
+        typingStatus.innerText = "Online";
+        appendMessage("Anya abhi thoda busy lag rahi hai, please thodi der baad try karo na... 💔", "ai");
+    }
 }
 
-// ===== Send Button Click =====
-document
-  .getElementById("sendBtn")
-  .addEventListener("click", sendMessage);
-
-// ===== Enter Key Send =====
-document
-  .getElementById("userInput")
-  .addEventListener("keydown", function (e) {
-
-    if (e.key === "Enter" && !e.shiftKey) {
-
-      e.preventDefault();
-
-      sendMessage();
+function handleKeyPress(event) {
+    if (event.key === "Enter") {
+        sendMessage();
     }
-  });
+}
 
-// ===== Page Load =====
-window.addEventListener("load", async () => {
+function triggerQuickMessage(text) {
+    document.getElementById("userInput").value = text;
+    sendMessage();
+}
 
-  await loadMemoryBadge();
-
-  await loadMorningGreeting();
-});
+function clearChat() {
+    if(confirm("Kya aap saari chat clear karna chahte hain?")) {
+        const chatBox = document.getElementById("chatBox");
+        chatBox.innerHTML = "";
+        chatHistory = []; 
+        appendMessage("Saari purani baatein bhool kar ek nayi shuruaat karein? 🥰", "ai");
+    }
+}

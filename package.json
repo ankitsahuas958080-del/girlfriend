@@ -12,9 +12,14 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/genai": "^2.8.0",
+    "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "node-fetch": "^3.3.2"
+    "grok-sdk": "^0.0.1-security",
+    "groq-sdk": "^1.2.1",
+    "node-fetch": "^3.3.2",
+    "openai": "^6.42.0"
   }
 }
